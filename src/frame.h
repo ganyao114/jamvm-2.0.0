@@ -23,23 +23,34 @@
    better double floating-point performance */
 #define ALIGN_OSTACK(pntr) (uintptr_t*)(((uintptr_t)(pntr) + 7) & ~7)
 
+//为方法执行创建栈帧
 #define CREATE_TOP_FRAME(ee, class, mb, sp, ret)                \
 {                                                               \
+    /* 准备操作数栈 */                                            \
     Frame *last = ee->last_frame;                               \
+    /* 计算新栈帧地址：                                             
+    算法是新栈帧开始地址 = 上一个栈帧的开始地址 + 上个栈帧大小 */        \
     Frame *dummy = (Frame *)(last->ostack+last->mb->max_stack); \
     Frame *new_frame;                                           \
-    uintptr_t *new_ostack;                                      \
-                                                                \
+    uintptr_t *new_ostack;                                      \                                                            
+    /* 新栈帧中本地变量栈开始地址 */                                \                                                            
     ret = (void*) (sp = (uintptr_t*)(dummy+1));                 \
+    /* 新栈帧中操作数栈开始地址 */                                  \ 
     new_frame = (Frame *)(sp + mb->max_locals);                 \
+    /* 对齐 */                                                  \
     new_ostack = ALIGN_OSTACK(new_frame + 1);                   \
                                                                 \
+    /* 检查栈溢出 */                                              \
     if((char*)(new_ostack + mb->max_stack) > ee->stack_end) {   \
         if(ee->overflow++) {                                    \
             /* Overflow when we're already throwing stack       \
                overflow.  Stack extension should be enough      \
                to throw exception, so something's seriously     \
                gone wrong - abort the VM! */                    \
+            /* 如果走到这一步，意味着当前VM无法抛出栈溢出异常，
+            因为只有嵌套抛出栈溢出
+            即在处理栈溢出异常时依然栈溢出时候才会走到这里
+            ，只能强制结束 VM */                                   \
             printf("Fatal stack overflow!  Aborting VM.\n");    \
             exitVM(1);                                          \
         }                                                       \

@@ -47,6 +47,8 @@ uintptr_t *executeJava() {
 
    /* Caching is supported in all variants and
       may be enabled or disabled */
+
+    //如果使用栈顶缓存优化，则在这里定义栈顶缓存
 #ifdef USE_CACHE
     union {
         struct {
@@ -60,22 +62,34 @@ uintptr_t *executeJava() {
     /* Variable definitions holding the interpreter
        state.  These are common to all interpreter
        variants */
+    //保存解释器状态的变量定义。这些对于所有解释器变体都是通用的
     uintptr_t *arg1;
+
+    //PC 指针
     register CodePntr pc;
+
+    //取出当前方法栈，和其中的操作数栈与本地变量栈
     ExecEnv *ee = getExecEnv();
     Frame *frame = ee->last_frame;
     register uintptr_t *lvars = frame->lvars;
     register uintptr_t *ostack = frame->ostack;
 
+    //方法所在对象
     Object *this = (Object*)lvars[0];
+    //方法结构体
     MethodBlock *new_mb, *mb = frame->mb;
+    //常量池
     ConstantPool *cp = &(CLASS_CB(mb->class)->constant_pool);
 
     CACHED_POLY_OFFSETS
 
     /* Initialise pc to the start of the method.  If it
        hasn't been executed before it may need preparing */
+
+    //准备方法   
     PREPARE_MB(mb);
+
+    //将pc初始化为方法的开头。如果尚未执行，则可能需要准备
     pc = (CodePntr)mb->code;
 
     /* The initial dispatch code - this is specific to

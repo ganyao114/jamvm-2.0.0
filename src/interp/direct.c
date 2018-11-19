@@ -72,9 +72,11 @@ void initialiseDirect(InitArgs *args) {
 void prepare(MethodBlock *mb, const void ***handlers) {
     int code_len = mb->code_size;
 #ifdef USE_CACHE
+    //栈顶缓存的深度
     signed char cache_depth[code_len + 1];
 #endif
 #ifdef INLINING
+    //内联优化，类初始化方法不加入内联
     int inlining = inlining_enabled && mb->name != SYMBOL(class_init);
     BasicBlock *last_block = NULL;
     OpcodeInfo opcodes[code_len];
@@ -95,6 +97,7 @@ void prepare(MethodBlock *mb, const void ***handlers) {
        only prepared once, and contention to prepare a method
        is unlikely. */
 
+    //加锁，防止方法重复准备
     Thread *self = threadSelf();
 
     disableSuspend(self);
@@ -128,17 +131,19 @@ retry:
     /* Exception handlers are entered at cache-depth zero.  Initialise
        the start of each handler to trap "fall-through" into the handler
        -- this should never happen in code produced by javac */
+    //将每个异常处理分支代码的开始设为 0   
     for(i = 0; i < mb->exception_table_size; i++)
         cache_depth[mb->exception_table[i].handler_pc] = 0;
 #endif
 #ifdef INLINING
     /* Mark the start opcode of each exception handler as an
        exception */
+    //将每个异常处理的开始操作码标记为 “异常操作代码”
     memset(info, FALSE, code_len + 1);
     for(i = 0; i < mb->exception_table_size; i++)
         info[mb->exception_table[i].handler_pc] = HANDLER;
 #endif
-
+    //对方法所有代码做两次遍历
     for(pass = 0; pass < 2; pass++) {
         int block_quickened = FALSE;
 #ifdef INLINING
@@ -147,6 +152,7 @@ retry:
         int cache = 0;
         int pc;
 
+        //第二次遍历，分配新代码即优化过的代码的内存空间
         if(pass == 1)
             new_code = sysMalloc((ins_count + 1) * sizeof(Instruction));
 
@@ -158,6 +164,8 @@ retry:
 
             /* Load the opcode -- we change it if it's WIDE, or ALOAD_0
                and the method is an instance method */
+
+            //加载指令 - 如果它是 WIDE指 令，我们更改它，或者ALOAD_0，并且方法是实例方法
             opcode = code[pc];
 
             /* On pass one we calculate the cache depth and the mapping
@@ -183,6 +191,12 @@ retry:
             operand.i = 0;
             ins_cache = cache;
 
+            //开始匹配优化 Case 并且生成优化 Code
+            /**
+             * 优化主要有几种
+             * 一种比较普遍的是将带有 index 操作数的指令替换为直接引用以省略运行时根据 index 查找常量或者其他引用的时间
+             * 二是将一些比较固定的代码组合替换为 JVM 内部指定的伪指令
+             **/
             switch(opcode) {
                 default:
                     jam_printf("Unrecognised bytecode %d found while preparing %s.%s%s\n",
@@ -201,6 +215,12 @@ retry:
                        can safely resolve the field because as an instance method
                        the class must be initialised */
 
+                    //当在当前类 load 一个本类 Field 的时候，那么它的 Code 形式一般是
+                    /**
+                     * ALOAD_0 this 指针入操作栈
+                     * GETFIELD 从操作栈顶的对象中 get 指定 Field 的值 
+                     * */
+                    //那么这个就是一个普遍可以优化的指令，这里直接将这个 Field 解析出来并且把 GETFIELD 指令替换成自己的 JVM 内部伪指令 GETFIELD_THIS，并将 Field 的偏移保存到操作数中
                     if((code[++pc] == OPC_GETFIELD) && !(mb->access_flags & ACC_STATIC)
                                     && (fb = resolveField(mb->class, READ_U2_OP(code + pc)))
                                     && !((*fb->type == 'J') || (*fb->type == 'D'))) {
@@ -216,6 +236,7 @@ retry:
                     break;
                 }
                 case OPC_SIPUSH:
+                    //加载 Int 常量
                     operand.i = READ_S2_OP(code + pc);
 #ifdef USE_CACHE
                     if(cache < 2) 
@@ -318,7 +339,8 @@ retry:
                 case OPC_LXOR: case OPC_LSHL: case OPC_LSHR:
                 case OPC_LUSHR: case OPC_F2L: case OPC_D2L:
                 case OPC_LNEG: case OPC_I2L:
-#ifdef USE_CACHE
+#ifdef USE_CACHE    
+                    //LONG 需要64位寄存器 Cache
                     cache = 2;
                     pc += 1;
                     break;
@@ -400,7 +422,8 @@ retry:
                     operand.ii.i2 = READ_S1_OP(code + pc + 1);
                     pc += 3;
                     break;
-    
+
+                //此类分支跳转的处理是为了修正优化后的 Code 地址错误，因为优化后 Code 位置有所改变，那么原来分支跳转指令的地址将不准确
                 case OPC_IFEQ: case OPC_IFNULL: case OPC_IFNE:
                 case OPC_IFNONNULL: case OPC_IFLT: case OPC_IFGE:
                 case OPC_IFGT: case OPC_IFLE: case OPC_IF_ACMPEQ:
@@ -408,6 +431,7 @@ retry:
                 case OPC_IF_ICMPLT: case OPC_IF_ICMPGE: case OPC_IF_ICMPGT:
                 case OPC_IF_ICMPLE:
                 {
+                    //得到跳转的地址
                     int dest = pc + READ_S2_OP(code + pc);
 #ifdef USE_CACHE
                     /* Conflict can only occur on first pass, and dest must be backwards */
@@ -447,6 +471,8 @@ retry:
                     break;
                 }
 
+
+                //此类是修正方法或者类型引用的操作数位置
                 case OPC_INVOKEVIRTUAL: case OPC_INVOKESPECIAL:
                 case OPC_INVOKESTATIC: case OPC_CHECKCAST:
                 case OPC_INSTANCEOF: case OPC_PUTFIELD:
@@ -456,7 +482,8 @@ retry:
 #endif
                     pc += 3;
                     break;
-        
+
+                //修正代码位置
                 case OPC_GOTO_W:
                 case OPC_GOTO:
                 {
@@ -827,6 +854,12 @@ retry:
                The NOP is inserted by writing the current instruction and then
                replacing it with a NOP.  This is done so that the basic block
                (calculated below) includes the NOP */
+
+                /* 如果通过分支到达下一条指令（或捕获异常），则深度已知。
+                如果这与“通过”的深度不同，我们就会发生冲突。通过在适当的深度处插入NOP来重新缓存它。
+                这也处理死代码。注意，这一般只发生在x？ y：z代码序列。
+                通过写入当前指令然后用NOP替换NOP来插入NOP。
+                这样做是为了使基本块（下面计算）包括NOP */
 
             if((cache_depth[pc] != DEPTH_UNKNOWN) && (cache_depth[pc] != cache)) {
                 TRACE("CONFLICT @ addr: %d depth1 %d depth2 %d\n", pc, cache_depth[pc], cache);

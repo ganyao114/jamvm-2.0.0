@@ -28,6 +28,7 @@
 #include "properties.h"
 #include "jni-internal.h"
 
+//单精度
 #define VA_DOUBLE(args, sp)                                 \
     if(*sig == 'D')                                         \
         *(double*)sp = va_arg(args, double);                \
@@ -35,6 +36,7 @@
         *(u8*)sp = va_arg(args, u8);                        \
     sp+=2
          
+//双精度         
 #define VA_SINGLE(args, sp)                                 \
     if(*sig == 'L' || *sig == '[')                          \
         *sp = va_arg(args, uintptr_t) & ~REF_MASK;          \
@@ -103,36 +105,52 @@ void *executeMethodArgs(Object *ob, Class *class, MethodBlock *mb, ...) {
     return ret;
 }
 
+//带参数执行某个方法
 void *executeMethodVaList(Object *ob, Class *class, MethodBlock *mb,
                           va_list jargs) {
-
+    
+    //获得当前线程的执行环境 *
     ExecEnv *ee = getExecEnv();
+    //取出方法的 Signature，即签名
     char *sig = mb->type;
+    //本地变量栈指针
     uintptr_t *sp;
+    //方法返回值指针
     void *ret;
 
+    //为方法执行创建栈帧 *
     CREATE_TOP_FRAME(ee, class, mb, sp, ret);
 
     /* copy args onto stack */
 
+    //如果是调用非静态方法，将方法所在类的实例对象推入本地变量栈顶
     if(ob)
         *sp++ = (uintptr_t) ob; /* push receiver first */
 
+    //开始处理方法参数 *
+    //参数逐个推入本地变量栈
     SCAN_SIG(sig, VA_DOUBLE(jargs, sp), VA_SINGLE(jargs, sp))
 
+    //同步方法则加对象锁
     if(mb->access_flags & ACC_SYNCHRONIZED)
+        //这里可以看出来，同步方法块锁的是方法当前对象或者静态方法当前类
         objectLock(ob ? ob : mb->class);
 
+
     if(mb->access_flags & ACC_NATIVE)
+        //静态方法进入 native 方法分发 *
         (*mb->native_invoker)(class, mb, ret);
     else
+        //开始解释执行 java 方法
         executeJava();
 
     if(mb->access_flags & ACC_SYNCHRONIZED)
         objectUnlock(ob ? ob : mb->class);
 
+    //方法结束，抛弃栈帧
     POP_TOP_FRAME(ee);
 
+    //处理方法返回值
     return ADJUST_RET_ADDR(ret, *sig);
 }
 

@@ -697,7 +697,9 @@ typedef struct classblock {
 
 typedef struct frame {
    CodePntr last_pc;
+   //本地变量栈
    uintptr_t *lvars;
+   //操作数栈
    uintptr_t *ostack;
    MethodBlock *mb;
    struct frame *prev;
@@ -711,13 +713,21 @@ typedef struct jni_frame {
    struct frame *prev;
 } JNIFrame;
 
+//线程执行环境
 typedef struct exec_env {
+    //异常
     Object *exception;
+    //方法栈开始地址
     char *stack;
+    //方法栈结束地址
     char *stack_end;
+    //方法栈大小
     int stack_size;
+    //最新的栈帧
     Frame *last_frame;
+    //线程对象
     Object *thread;
+    //栈溢出标志
     char overflow;
 } ExecEnv;
 
