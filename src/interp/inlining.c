@@ -157,6 +157,7 @@ void showRelocatability() {
     }
 }
 
+//检查是否可以重定向
 int checkRelocatability() {
     char ***handlers = (char ***)executeJava();
     int i;
@@ -178,7 +179,7 @@ int checkRelocatability() {
        This is used to tell which handlers in a method have
        been rewritten when freeing the method data on class
        unloading */
-
+    //计算指令的 handler 代码范围。这用于说明在类卸载时释放方法数据时已重写方法中的哪些处理程序
     for(i = 0; i < HANDLERS; i++) {
         int j;
 
@@ -569,6 +570,7 @@ int blockSeqCodeLen(BasicBlock *start, int ins_start, BasicBlock *end,
     return code_len;
 }
 
+//拷贝 Inline Code
 char *insSeqCodeCopy(char *code_pntr, Instruction *ins_start_pntr, char **map,
                      BasicBlock **patchers, BasicBlock *block, int start,
                      int len) {
@@ -584,7 +586,7 @@ char *insSeqCodeCopy(char *code_pntr, Instruction *ins_start_pntr, char **map,
         opcode = opcodes[i].opcode;
         depth = opcodes[i].cache_depth;
         size = handler_sizes[depth][opcode];
-
+        //拷贝字节码指令对应的 label 下的 native 代码
         memcpy(code_pntr, instructions[i].handler, size);
     }
 
@@ -610,6 +612,7 @@ char *blockSeqCodeCopy(MethodBlock *mb, TestCodeBlock *block, BasicBlock *start,
 
     block->patchers = NULL;
 
+    //拷贝字节码代码块中指令对应的 Handler 代码
     if(start == end)
         code_pntr = insSeqCodeCopy(code_pntr, ins_start_pntr, map,
                    &block->patchers, start, ins_start, ins_end - ins_start + 1);
@@ -704,9 +707,11 @@ void inlineSequence(MethodBlock *mb, BasicBlock *start, int ins_start,
     CodeBlockHeader *hashed_block;
     TestCodeBlock *block;
     int code_len;
+    //拷贝对应 handler 代码的末尾地址
     char *pntr;
 
     /* Calculate sequence length */
+    //计算代码长度 = 所有字节码指令对应的 handler 代码长度 + 末尾 goto 跳转块的长度
     code_len = goto_len + blockSeqCodeLen(start, ins_start, end, ins_end);
 
     /* The prospective sequence is generated in malloc-ed memory
@@ -718,9 +723,11 @@ void inlineSequence(MethodBlock *mb, BasicBlock *start, int ins_start,
     block->code_len = code_len;
 
     /* Concatenate the handler bodies together */
+    //拷贝对应的 handler 代码 *
     pntr = blockSeqCodeCopy(mb, block, start, ins_start, end, ins_end);
 
     /* Add the dispatch onto the end of the super-instruction */
+    //代码块末尾拷贝 goto 语句的代码用于分发跳转到其他块
     memcpy(pntr, goto_start, goto_len);
 
     /* Look up new block in inlined block cache */
@@ -825,6 +832,7 @@ void inlineBlocks(MethodBlock *mb, BasicBlock *start, BasicBlock *end) {
             if(handler_sizes[cache_depth][opcode] < 0) {
                 if(start != block || i > ins_start) {
                     if(i != 0)
+                        //添加内联代码 *
                         inlineSequence(mb, start, ins_start, block, i - 1);
                     else
                         inlineSequence(mb, start, ins_start, block->prev,

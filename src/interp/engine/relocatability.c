@@ -70,6 +70,7 @@ int calculateRelocatability(int handler_sizes[HANDLERS][LABELS_SIZE]) {
 
     /* Check relocatability of each handler. */
 
+    //计算所有 label 对应的 jit code 即 native code 的大小，并保存到 handler_sizes 中
     for(i = 0; i < HANDLERS; i++) {
         int j;
 
