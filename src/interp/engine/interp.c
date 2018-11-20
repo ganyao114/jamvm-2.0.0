@@ -39,6 +39,8 @@
 #include "class.h"
 #include "classlib.h"
 
+//解释执行 Java 方法
+//这个方法不带参数想必是不想让参数占用宝贵的寄存器
 uintptr_t *executeJava() {
 
     /* Definitions specific to the particular
@@ -94,9 +96,36 @@ uintptr_t *executeJava() {
 
     /* The initial dispatch code - this is specific to
        the interpreter variant */
+
+    //指令分发宏,根据宏定义可以是 switch 分发，或者是 goto 分发
+    /**
+     * while - switch 
+     * while(true) {
+     *      switch(*pc) {
+     *          label_op_1:
+     *          label_op_2:
+     *          label_op_3:
+     *          label_op_n:
+     *          .......
+     *      }     
+     * }
+     **/   
+    /**
+        {
+            next_handler = pc[1].handler;
+            goto *pc->handler;
+        }
+        同时每个指令 label 末尾都有 DISPATCH 宏(除了自带跳转的指令，例如 switch，if 等)，用于 goto 到下一个指令
+     **/
+     /**
+        如果是 inling 过的方法
+        直接 goto 到第一个 label 就可以了
+     **/      
     INTERPRETER_PROLOGUE
 
     /* Definitions of the opcode handlers */
+
+    //定义 opcode，其实就是在方法体内定义一堆 label
 
 #define MULTI_LEVEL_OPCODES(level)                         \
     DEF_OPC(OPC_ICONST_M1, level,                          \
@@ -383,6 +412,8 @@ uintptr_t *executeJava() {
     ZERO_DIVISOR_CHECK((int)cache.i.v2);
 
 #ifdef USE_CACHE
+//本来 PUSH_0 是将常量推入操作数栈
+//现在使用栈顶缓存的话，就直接将常量付值给 cache 中的 v1 模拟寄存器                
 #define PUSH_0(value, ins_len)                             \
     cache.i.v1 = value;                                    \
     DISPATCH(1, ins_len);
@@ -477,6 +508,12 @@ uintptr_t *executeJava() {
 #define UNARY_MINUS_2                                      \
     PUSH_1(-(int)cache.i.v2, 1);
 
+//这里分三个等级，对应栈顶缓存的三个等级，且假设下列 OP 为 +
+/**
+ * 等级1:不使用栈顶缓存，则栈中 1，2 操作数相加
+ * 等级2:使用1个栈顶缓存，则 v1 虚拟寄存器与栈中另一个操作数相加
+ * 等级3:两个操作数都使用栈顶缓存，则是 v1 和 v2 相加
+ **/
 #define BINARY_OP_0(OP)                                    \
     ostack -= 2;                                           \
     PUSH_0((int)ostack[0] OP (int)ostack[1], 1);

@@ -41,6 +41,7 @@ unused:
 #define INTERPRETER_DEFINITIONS                            \
     /* none */
 
+//循环分发代码
 #define DISPATCH_PROLOGUE                                  \
     while(TRUE) {                                          \
         switch(*pc) {                                      \

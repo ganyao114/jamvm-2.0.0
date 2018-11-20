@@ -46,6 +46,7 @@ char *findNextLabel(char **pntrs, char *pntr) {
     return NULL;
 }
 
+//检查间接goto的可重定位性。这被复制到每个指令的末尾。如果这是不可重定位的，则禁用内联
 int calculateRelocatability(int handler_sizes[HANDLERS][LABELS_SIZE]) {
     char ***handlers1 = (char ***)executeJava();
     char ***handlers2 = (char ***)executeJava2();

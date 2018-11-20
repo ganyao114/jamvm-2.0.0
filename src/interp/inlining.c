@@ -740,10 +740,11 @@ void inlineSequence(MethodBlock *mb, BasicBlock *start, int ins_start,
     }
 }
 
+//开始内联代码块
 void inlineBlocks(MethodBlock *mb, BasicBlock *start, BasicBlock *end) {
     BasicBlock *block, *terminator = end->next;
     int ins_start = 0;
-
+    //遍历代码块
     for(block = start; block != terminator; block = block->next) {
         int i;
 
@@ -755,6 +756,7 @@ void inlineBlocks(MethodBlock *mb, BasicBlock *start, BasicBlock *end) {
             /* The block opcodes contain the "un-quickened" opcode.
                This could have been quickened to one of several quick
                versions. */
+            //替换指令到“快速指令”以适应 lining 后的运行   
             switch(opcode) {
                 case OPC_LDC:
                     op1 = OPC_LDC_QUICK;
@@ -800,6 +802,7 @@ void inlineBlocks(MethodBlock *mb, BasicBlock *start, BasicBlock *end) {
 
             if(op1 > 0) {
                 /* Match which quickened opcode */
+                //匹配哪个加速代码
                 char *match = handler_entry_points[cache_depth][op1];
                 char *handler = (char*) block->start[i].handler;
 
@@ -818,6 +821,7 @@ void inlineBlocks(MethodBlock *mb, BasicBlock *start, BasicBlock *end) {
             }
 
             /* A non-relocatable opcode ends a sequence */
+            //不可重定位的操作码结束序列
             if(handler_sizes[cache_depth][opcode] < 0) {
                 if(start != block || i > ins_start) {
                     if(i != 0)
@@ -952,6 +956,8 @@ void inlineBlock(MethodBlock *mb, BasicBlock *block, Thread *self) {
    subsequent blocks which require quickening cannot be inlined until
    they have been executed).
 */
+//像 Code 中添加性能分析器入口
+//一旦开启性能分析将不会立刻内联代码，而是等待性能分析的结果，达到阈值后才会开始内联
 void addToProfile(MethodBlock *mb, BasicBlock *block, Thread *self) {
     ProfileInfo *info = sysMalloc(sizeof(ProfileInfo));
 
@@ -967,6 +973,8 @@ void addToProfile(MethodBlock *mb, BasicBlock *block, Thread *self) {
     mb->profile_info = info;
 
     info->handler = block->start->handler;
+
+    //Code 块开始指令被替换为性能分析入口
     block->start->handler = handler_entry_points[0][OPC_PROFILE_REWRITER];
 
     rewriteUnlock(self);
@@ -977,7 +985,7 @@ void prepareBlock(MethodBlock *mb, BasicBlock *block, Thread *self) {
         addToProfile(mb, block, self);
     else {
         rewriteUnlock(self);
-
+        //开始内联 *
         inlineBlocks(mb, block, block);
         sysFree(block->opcodes);
         sysFree(block);
@@ -1016,6 +1024,7 @@ void inlineBlockWrappedOpcode(MethodBlock *mb, Instruction *pc) {
    blocks within the method that end with a quickened instruction.  If
    the quickened instruction being executed is in the list we must have
    reached the end of a block and we need to inline it */
+//inling 检查符合条件则进行内联   
 void checkInliningQuickenedInstruction(Instruction *pc, MethodBlock *mb) {
 
     /* As there could be multiple threads executing this method,
@@ -1027,6 +1036,7 @@ void checkInliningQuickenedInstruction(Instruction *pc, MethodBlock *mb) {
         Thread *self = threadSelf();
         rewriteLock(self);
 
+        //遍历 direct.prepare 中收集的新指令
         /* Search list */
         for(info = mb->quick_prepare_info; info && info->quickened != pc;
             last = info, info = info->next);

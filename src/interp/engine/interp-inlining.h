@@ -173,7 +173,7 @@ d##X: {                \
 #endif
 
 /* Macros for handler/bytecode rewriting */
-
+//检查 inlining 优化的入口
 #define OPCODE_REWRITE(opcode, cache, new_operand)         \
 {                                                          \
     pc->handler = &&rewrite_lock;                          \
