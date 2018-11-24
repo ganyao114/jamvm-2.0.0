@@ -123,6 +123,8 @@ retry:
 
     TRACE("Preparing %s.%s%s\n", CLASS_CB(mb->class)->name, mb->name, mb->type);
 
+    printf("Preparing %s.%s%s\n", CLASS_CB(mb->class)->name, mb->name, mb->type);
+
 #ifdef USE_CACHE
     /* Initialise cache depth array, indicating that
        the depth of every bytecode is unknown */
