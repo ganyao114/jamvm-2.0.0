@@ -85,6 +85,8 @@ uintptr_t *executeJava() {
     //常量池
     ConstantPool *cp = &(CLASS_CB(mb->class)->constant_pool);
 
+    printf("executeJava - %s.%s - %s\n", CLASS_CB(mb->class)->name, mb->name, mb->signature);
+
     CACHED_POLY_OFFSETS
 
     /* Initialise pc to the start of the method.  If it

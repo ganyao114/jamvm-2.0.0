@@ -612,6 +612,8 @@ char *blockSeqCodeCopy(MethodBlock *mb, TestCodeBlock *block, BasicBlock *start,
 
     block->patchers = NULL;
 
+    printf("iniling block - %s.%s\n", CLASS_CB(mb->class)->name, mb->name);
+
     //拷贝字节码代码块中指令对应的 Handler 代码
     if(start == end)
         code_pntr = insSeqCodeCopy(code_pntr, ins_start_pntr, map,
