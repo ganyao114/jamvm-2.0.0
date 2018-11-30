@@ -73,7 +73,9 @@ uintptr_t *executeJava() {
     //取出当前方法栈，和其中的操作数栈与本地变量栈
     ExecEnv *ee = getExecEnv();
     Frame *frame = ee->last_frame;
+    //本地变量栈指针存在寄存器中，因为这样每次查找本地变量时可以节省一次内存寻址
     register uintptr_t *lvars = frame->lvars;
+    //操作数栈同理
     register uintptr_t *ostack = frame->ostack;
 
     //方法所在对象

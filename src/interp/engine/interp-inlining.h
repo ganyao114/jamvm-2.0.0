@@ -134,6 +134,7 @@ unused:                                                               \
    stack (it also ignores the register modifier).  The dummy handlers are
    used to force gcc to promote lvars, by increasing its apparent importance.
 */
+//第三方 gcc hack。在x86_64上，当“lvars”(本地变量) 被放置在寄存器中时，可以实现更高的性能。但是，gcc不会这样做，将它放在堆栈上（它也忽略了寄存器修饰符）。虚拟处理程序用于强制 gcc 加速lvars ，通过增加其明显的重要性
 #ifdef __x86_64__
 #define DEFINE_DUMMY_TABLE                                                 \
     HANDLER_TABLE_T *dummy_table[] = {                                     \

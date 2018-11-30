@@ -1044,7 +1044,7 @@ void checkInliningQuickenedInstruction(Instruction *pc, MethodBlock *mb) {
         Thread *self = threadSelf();
         rewriteLock(self);
 
-        //遍历 direct.prepare 中收集的新指令
+        //遍历 direct.prepare 中收集的指令,找到 pc 对应的 Instruction
         /* Search list */
         for(info = mb->quick_prepare_info; info && info->quickened != pc;
             last = info, info = info->next);
@@ -1072,6 +1072,8 @@ void checkInliningQuickenedInstruction(Instruction *pc, MethodBlock *mb) {
    first 4.  This is more consistent than a hashtable where hit
    rate decreases with table occupancy.
 */
+
+//如果已达到执行阈值，则在块的配置文件列表中搜索并内联。配置文件列表是按方法，块将添加到列表的头部。测试显示，在前2个条目中找到70％的搜索，在前4个条目中找到90％。这比使用表占用率的命中率降低的哈希表更加一致
 void *inlineProfiledBlock(Instruction *pc, MethodBlock *mb, int force_inlining) {
     Thread *self = threadSelf();
     ProfileInfo *info;
@@ -1080,9 +1082,12 @@ void *inlineProfiledBlock(Instruction *pc, MethodBlock *mb, int force_inlining) 
     rewriteLock(self);
 
     /* Search profile cache for block */
+
+    //遍历找到 profile info
     for(info = mb->profile_info; info != NULL && info->block->start != pc;
         info = info->next);
 
+    //计数器自增，达到阈值则开始 JIT
     if(info != NULL && (force_inlining ||
                         info->profile_count++ >= profile_threshold)) {
 
